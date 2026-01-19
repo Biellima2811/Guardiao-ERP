@@ -5,32 +5,38 @@ from core.security import SecurityAuth
 from gui.screen_login import LoginScreen
 from gui.screen_app import MainAppScreen 
 import os 
+from core.logger import log_info, log_erro
 
-class GuardiaoApp(ttk.Window):
+
+class SynapseApp(ttk.Window): # Nome da classe atualizado
     def __init__(self):
         super().__init__(themename="flatly")
-        self.title("Guardião ERP - Sistema Integrado")
+        self.title("SynapseERP - Sistema Integrado")
         self.geometry("1280x720")
         
-        # --- CONFIGURAÇÃO DO ÍCONE (.ico) ---
-        # O método iconbitmap é específico para arquivos .ico no Windows
-        caminho_icone = "assets/logo_guardiao.ico"
-        if os.path.exists(caminho_icone):
-            try:
-                self.iconbitmap(caminho_icone)
-            except Exception as e:
-                print(f"Erro ao carregar ícone: {e}")
+        # Log de inicialização
+        log_info("Sistema SynapseERP iniciado.")
+        
+        # Ícone
+        icones_possiveis = ["assets/SynapseERP.ico"]
+        
+        for icone in icones_possiveis:
+            if os.path.exists(icone):
+                try:
+                    self.iconbitmap(icone)
+                    log_info(f"Ícone carregado: {icone}")
+                    break
+                except Exception as e:
+                    log_erro("Erro no ícone", e)
 
-        # Variáveis de monitoramento (Timeout de segurança)
-        self.tempo_limite = 5 * 60 * 1000 # 5 minutos
+        # Timeout
+        self.tempo_limite = 10 * 60 * 1000 # Aumentei para 10 min (padrão melhor)
         self.id_timer = None
 
-        # Monitora atividade
         self.bind_all('<Any-KeyPress>', self.resetar_timer)
         self.bind_all('<Any-ButtonPress>', self.resetar_timer)
         self.bind_all('<Motion>', self.resetar_timer)
 
-        # Inicializa
         SecurityAuth.criar_admin_padrao()
         self.mostrar_login()
 
@@ -41,8 +47,9 @@ class GuardiaoApp(ttk.Window):
         self.login = LoginScreen(self, on_login_success=self.iniciar_sistema)
 
     def iniciar_sistema(self):
+        log_info("Login realizado com sucesso. Carregando Dashboard.")
         self.state('zoomed')
-        self.title("Guardião ERP - Painel Principal")
+        self.title("SynapseERP - Painel Principal")
         self.app = MainAppScreen(self, usuario_logado="Admin")
         self.resetar_timer()
 
@@ -55,10 +62,11 @@ class GuardiaoApp(ttk.Window):
     
     def realizar_logoff_automatico(self):
         if hasattr(self, 'app') and self.app.winfo_exists():
+            log_info("Sessão expirada por inatividade.")
             self.app.destroy()
             self.mostrar_login()
             messagebox.showwarning('Segurança', "Sessão expirada por inatividade.")
 
 if __name__ == "__main__":
-    app = GuardiaoApp()
+    app = SynapseApp()
     app.mainloop()

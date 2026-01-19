@@ -25,8 +25,8 @@ class LoginScreen(ttk.Frame):
         diretorio_atual = os.path.dirname(os.path.abspath(__file__))
         # 2. Sobe um nível para ir para a pasta raiz (Guardiao-ERP)
         diretorio_raiz = os.path.dirname(diretorio_atual)
-        # 3. Monta o caminho final para assets/logo_guardiao.png
-        caminho_logo = os.path.join(diretorio_raiz, "assets", "logo_guardiao.png")
+        # 3. Monta o caminho final para assets/SynapseERP.png
+        caminho_logo = os.path.join(diretorio_raiz, "assets", "SynapseERP.png")
 
         # Debug: Imprime no terminal onde ele está procurando (ajuda a achar erros)
         print(f"Procurando imagem em: {caminho_logo}")
@@ -50,7 +50,7 @@ class LoginScreen(ttk.Frame):
             ttk.Label(left_content, text="[Logo Aqui]", bootstyle="inverse-primary").pack(pady=20)
         
         #ttk.Label(left_content, text="GUARDIÃO ERP", font=("Calibri", 30, "bold"), bootstyle="inverse-primary").pack()
-        ttk.Label(left_content, text="Gestão Inteligente e Segura", font=("Calibri", 12, "italic"), bootstyle="inverse-primary").pack(pady=10)
+        ttk.Label(left_content, text="Gestão Inteligente e Segura", font=("Calibri", 12, "italic"), bootstyle="inverse-primary").pack(pady=5)
 
         # --- LADO DIREITO (Formulário) ---
         self.right_side = ttk.Frame(self, bootstyle="light")
@@ -75,7 +75,7 @@ class LoginScreen(ttk.Frame):
         btn = ttk.Button(login_frame, text="ENTRAR", bootstyle="primary", command=self.fazer_login)
         btn.pack(fill=X, pady=10)
         
-        ttk.Label(login_frame, text="© 2026 Guardião Systems", font=("Arial", 8), bootstyle="secondary").pack(pady=(20, 0))
+        ttk.Label(login_frame, text="© 2026 Synapse Systems", font=("Arial", 8), bootstyle="secondary").pack(pady=(20, 0))
 
     def fazer_login(self):
         user = self.entry_user.get()

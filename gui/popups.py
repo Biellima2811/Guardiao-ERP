@@ -2,88 +2,359 @@ import ttkbootstrap as ttk
 from ttkbootstrap.constants import *
 from ttkbootstrap.dialogs import Messagebox
 from core.client_model import ClienteModel
+from core.os_model import OSModel
+import json
+import urllib.request # Para fazer a consulta na API ViaCEP
 
 class AddClientePopup(ttk.Toplevel):
     def __init__(self, parent, on_confirm):
         super().__init__(parent)
-        self.title("Novo Cadastro de Cliente")
-        self.geometry("600x450") # Um pouco mais largo para acomodar o grid
-        self.resizable(False, False)
+        self.title("Novo Cliente - Completo")
+        self.geometry("750x700") # Um pouquinho maior para caber tudo
         self.on_confirm = on_confirm
-        
         self.position_center()
 
-        # --- CONTAINER PRINCIPAL ---
-        # Criamos um frame para segurar o grid com padding
-        frame = ttk.Frame(self, padding=20)
+        frame = ttk.Frame(self, padding=25)
         frame.pack(fill=BOTH, expand=YES)
-
-        # Configuração das Colunas do Grid (para ficarem proporcionais)
-        # Coluna 0 e Coluna 1 terão o mesmo peso (50% cada)
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=1)
 
-        # --- LINHA 0: Título ---
-        ttk.Label(frame, text="Dados do Cliente", font=("Calibri", 16, "bold"), bootstyle="primary").grid(
-            row=0, column=0, columnspan=2, sticky=W, pady=(0, 20)
-        )
+        ttk.Label(frame, text="Dados Pessoais", font=("Calibri", 14, "bold"), bootstyle="primary").grid(row=0, columnspan=2, sticky=W, pady=10)
 
-        # --- LINHA 1: Nome (Ocupa as 2 colunas) ---
-        ttk.Label(frame, text="Nome Completo / Razão Social *").grid(row=1, column=0, columnspan=2, sticky=W)
-        self.entry_nome = ttk.Entry(frame)
-        self.entry_nome.grid(row=2, column=0, columnspan=2, sticky=EW, pady=(5, 15))
+        # Nome
+        self.criar_campo(frame, "Nome Completo *", 1, 0, 2)
+        self.entry_nome = self.ultimo_entry
 
-        # --- LINHA 2: CPF e Telefone (Lado a Lado) ---
+        # CPF e Telefone
+        self.criar_campo(frame, "CPF / CNPJ", 3, 0)
+        self.entry_cpf = self.ultimo_entry
         
-        # Coluna 0: CPF
-        ttk.Label(frame, text="CPF / CNPJ").grid(row=3, column=0, sticky=W)
-        self.entry_cpf = ttk.Entry(frame)
-        self.entry_cpf.grid(row=4, column=0, sticky=EW, pady=(5, 15), padx=(0, 10)) # padx na direita para separar
+        self.criar_campo(frame, "Telefone / WhatsApp", 3, 1)
+        self.entry_tel = self.ultimo_entry
 
-        # Coluna 1: Telefone
-        ttk.Label(frame, text="Telefone (WhatsApp)").grid(row=3, column=1, sticky=W)
-        self.entry_tel = ttk.Entry(frame)
-        self.entry_tel.grid(row=4, column=1, sticky=EW, pady=(5, 15))
+        # Email
+        self.criar_campo(frame, "E-mail", 5, 0, 2)
+        self.entry_email = self.ultimo_entry
 
-        # --- LINHA 3: Cidade ---
-        ttk.Label(frame, text="Cidade").grid(row=5, column=0, columnspan=2, sticky=W)
-        self.entry_cidade = ttk.Entry(frame)
-        self.entry_cidade.grid(row=6, column=0, columnspan=2, sticky=EW, pady=(5, 20))
+        # --- SEÇÃO DE ENDEREÇO INTELIGENTE ---
+        ttk.Separator(frame).grid(row=7, columnspan=2, sticky=EW, pady=15)
+        ttk.Label(frame, text="Endereço (Busca Automática)", font=("Calibri", 14, "bold"), bootstyle="primary").grid(row=8, columnspan=2, sticky=W, pady=10)
 
-        # --- LINHA 4: Botão Salvar ---
-        ttk.Button(frame, text="SALVAR CADASTRO", bootstyle="success", command=self.salvar).grid(
-            row=7, column=0, columnspan=2, sticky=EW, pady=10
-        )
+        # LINHA DO CEP (Com botão de busca)
+        frame_cep = ttk.Frame(frame)
+        frame_cep.grid(row=9, column=0, sticky=EW, padx=5)
         
-        # Aviso
-        ttk.Label(frame, text="* Campos Obrigatórios", bootstyle="secondary", font=("Arial", 8)).grid(
-            row=8, column=0, columnspan=2
-        )
+        ttk.Label(frame_cep, text="CEP").pack(anchor=W)
+        self.entry_cep = ttk.Entry(frame_cep)
+        self.entry_cep.pack(side=LEFT, fill=X, expand=YES)
+        
+        # Botão Lupa
+        btn_busca = ttk.Button(frame_cep, text="🔍", bootstyle="info-outline", command=self.buscar_cep)
+        btn_busca.pack(side=LEFT, padx=(5, 0))
+        
+        # Bind: Se apertar ENTER no campo CEP, também busca
+        self.entry_cep.bind("<Return>", lambda e: self.buscar_cep())
 
-    def salvar(self):
-        nome = self.entry_nome.get().strip()
-        cpf = self.entry_cpf.get().strip()
-        tel = self.entry_tel.get().strip()
-        cidade = self.entry_cidade.get().strip()
+        # UF (Estado) - Lado do CEP
+        self.criar_campo(frame, "Estado (UF)", 9, 1)
+        self.entry_uf = self.ultimo_entry
 
-        if not nome:
-            Messagebox.show_error("O campo Nome é obrigatório!", "Erro de Validação")
-            self.lift() # Traz a janela para frente se der erro
+        # Logradouro e Número
+        self.criar_campo(frame, "Logradouro (Rua/Av)", 11, 0) # Novo Campo
+        self.entry_logradouro = self.ultimo_entry
+
+        self.criar_campo(frame, "Número", 11, 1) # Novo Campo
+        self.entry_numero = self.ultimo_entry
+
+        # Bairro e Cidade
+        self.criar_campo(frame, "Bairro", 13, 0)
+        self.entry_bairro = self.ultimo_entry
+        
+        self.criar_campo(frame, "Cidade", 13, 1)
+        self.entry_cidade = self.ultimo_entry
+
+        # Botão Salvar
+        ttk.Button(frame, text="SALVAR CADASTRO", bootstyle="success", command=self.salvar).grid(row=15, columnspan=2, sticky=EW, pady=30)
+
+    def criar_campo(self, parent, texto, row, col, colspan=1):
+        ttk.Label(parent, text=texto).grid(row=row, column=col, sticky=W, padx=5)
+        entry = ttk.Entry(parent)
+        entry.grid(row=row+1, column=col, columnspan=colspan, sticky=EW, padx=5, pady=(0, 10))
+        self.ultimo_entry = entry
+
+    def buscar_cep(self):
+        """Consulta a API ViaCEP e preenche os campos"""
+        cep = self.entry_cep.get().replace("-", "").replace(".", "").strip()
+        
+        if len(cep) != 8:
+            Messagebox.show_error("CEP inválido! Digite 8 números.", "Erro")
             return
 
-        # Tenta salvar
-        if ClienteModel.adicionar(nome, cpf, tel, cidade):
-            Messagebox.show_info("Cliente cadastrado com sucesso!", "Sucesso")
-            self.on_confirm() # Atualiza a tabela lá atrás
-            self.destroy() # Fecha o popup
+        url = f"https://viacep.com.br/ws/{cep}/json/"
+        
+        try:
+            # Faz a requisição
+            with urllib.request.urlopen(url) as response:
+                dados = json.loads(response.read().decode())
+                
+            if "erro" in dados:
+                Messagebox.show_warning("CEP não encontrado!", "Aviso")
+                return
+            
+            # Preenche os campos (limpa antes para garantir)
+            self.preencher_campo(self.entry_logradouro, dados.get("logradouro", ""))
+            self.preencher_campo(self.entry_bairro, dados.get("bairro", ""))
+            self.preencher_campo(self.entry_cidade, dados.get("localidade", ""))
+            self.preencher_campo(self.entry_uf, dados.get("uf", ""))
+            
+            # Foca no número para agilizar
+            self.entry_numero.focus()
+            
+        except Exception as e:
+            Messagebox.show_error(f"Erro de conexão: {e}", "Erro")
+
+    def preencher_campo(self, entry_widget, valor):
+        entry_widget.delete(0, END)
+        entry_widget.insert(0, valor)
+
+    def salvar(self):
+        dados = [
+            self.entry_nome.get(), self.entry_cpf.get(), self.entry_tel.get(),
+            self.entry_email.get(), self.entry_cep.get(), 
+            self.entry_logradouro.get(), self.entry_numero.get(), # Novos campos
+            self.entry_bairro.get(), self.entry_cidade.get(), self.entry_uf.get()
+        ]
+        
+        if not dados[0]: 
+            Messagebox.show_error("Nome é obrigatório!")
+            return
+
+        if ClienteModel.adicionar(*dados):
+            Messagebox.show_info("Cliente Salvo com Sucesso!")
+            self.on_confirm()
+            self.destroy()
         else:
-            Messagebox.show_error("Erro ao salvar no banco de dados.", "Erro Crítico")
-            self.lift()
+            Messagebox.show_error("Erro ao salvar no banco.")
 
     def position_center(self):
         self.update_idletasks()
-        width = self.winfo_width()
-        height = self.winfo_height()
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
+        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
+        self.geometry(f'+{x}+{y}')
+
+
+# MANTENHA A CLASSE AddOSPopup IGUAL (Não precisa mexer nela agora)
+class AddOSPopup(ttk.Toplevel):
+    def __init__(self, parent, on_confirm):
+        super().__init__(parent)
+        self.title("Nova OS - Detalhada")
+        self.geometry("850x700")
+        self.on_confirm = on_confirm
+        self.position_center()
+
+        frame = ttk.Frame(self, padding=20)
+        frame.pack(fill=BOTH, expand=YES)
+        frame.columnconfigure(0, weight=1)
+        frame.columnconfigure(1, weight=1)
+        frame.columnconfigure(2, weight=1)
+
+        # LINHA 1
+        ttk.Label(frame, text="Cliente *").grid(row=0, column=0, sticky=W)
+        self.cbo_cliente = ttk.Combobox(frame, values=self.get_clientes(), state="readonly")
+        self.cbo_cliente.grid(row=1, column=0, columnspan=3, sticky=EW, pady=(0, 15))
+
+        # LINHA 2
+        ttk.Label(frame, text="Equipamento *").grid(row=2, column=0, sticky=W)
+        self.entry_equip = ttk.Entry(frame)
+        self.entry_equip.grid(row=3, column=0, sticky=EW, padx=(0, 5), pady=(0, 10))
+
+        ttk.Label(frame, text="Marca / Modelo").grid(row=2, column=1, sticky=W)
+        self.entry_marca = ttk.Entry(frame)
+        self.entry_marca.grid(row=3, column=1, sticky=EW, padx=5, pady=(0, 10))
+
+        ttk.Label(frame, text="Nº Série / IMEI").grid(row=2, column=2, sticky=W)
+        self.entry_serial = ttk.Entry(frame)
+        self.entry_serial.grid(row=3, column=2, sticky=EW, padx=5, pady=(0, 10))
+
+        # LINHA 3
+        ttk.Label(frame, text="Senha do Dispositivo").grid(row=4, column=0, sticky=W)
+        self.entry_senha = ttk.Entry(frame)
+        self.entry_senha.grid(row=5, column=0, sticky=EW, padx=(0, 5), pady=(0, 10))
+
+        ttk.Label(frame, text="Prioridade").grid(row=4, column=1, sticky=W)
+        self.cbo_prio = ttk.Combobox(frame, values=["Baixa", "Normal", "Alta", "URGENTE"], state="readonly")
+        self.cbo_prio.current(1)
+        self.cbo_prio.grid(row=5, column=1, sticky=EW, padx=5, pady=(0, 10))
+        
+        ttk.Label(frame, text="Acessórios").grid(row=4, column=2, sticky=W)
+        self.entry_acessorios = ttk.Entry(frame)
+        self.entry_acessorios.grid(row=5, column=2, sticky=EW, padx=5, pady=(0, 10))
+
+        # LINHA 4
+        ttk.Label(frame, text="Defeito Relatado *").grid(row=6, columnspan=3, sticky=W)
+        self.entry_defeito = ttk.Entry(frame)
+        self.entry_defeito.grid(row=7, columnspan=3, sticky=EW, pady=(0, 10))
+
+        # LINHA 5
+        ttk.Label(frame, text="Técnico Responsável").grid(row=8, column=0, sticky=W)
+        self.entry_tec = ttk.Entry(frame)
+        self.entry_tec.grid(row=9, column=0, sticky=EW, padx=(0, 5), pady=(0, 10))
+
+        ttk.Label(frame, text="Status Inicial").grid(row=8, column=1, sticky=W)
+        self.cbo_status = ttk.Combobox(frame, values=["Aberto", "Em Análise", "Aguardando Peça"], state="readonly")
+        self.cbo_status.current(0)
+        self.cbo_status.grid(row=9, column=1, sticky=EW, padx=5, pady=(0, 10))
+        
+        ttk.Label(frame, text="Previsão Entrega").grid(row=8, column=2, sticky=W)
+        self.entry_data = ttk.DateEntry(frame)
+        self.entry_data.grid(row=9, column=2, sticky=EW, padx=5, pady=(0, 10))
+
+        # LINHA 6
+        ttk.Label(frame, text="Observações Técnicas").grid(row=10, sticky=W)
+        self.txt_obs = ttk.Text(frame, height=4)
+        self.txt_obs.grid(row=11, columnspan=3, sticky=EW, pady=(0, 15))
+
+        # LINHA 7
+        ttk.Label(frame, text="Orçamento Estimado (R$)").grid(row=12, column=0, sticky=W)
+        self.entry_valor = ttk.Entry(frame)
+        self.entry_valor.insert(0, "0.00")
+        self.entry_valor.grid(row=13, column=0, sticky=EW, padx=(0, 5))
+
+        ttk.Button(frame, text="ABRIR NOVA OS", bootstyle="success", command=self.salvar).grid(row=14, columnspan=3, sticky=EW, pady=20)
+
+    def get_clientes(self):
+        try:
+            return [c[1] for c in ClienteModel.buscar_todos()]
+        except: return []
+
+    def salvar(self):
+        obs_completa = f"Marca: {self.entry_marca.get()} | Serial: {self.entry_serial.get()} | Senha: {self.entry_senha.get()} | Acessórios: {self.entry_acessorios.get()}\n\nObs: {self.txt_obs.get('1.0', END).strip()}"
+        
+        dados = {
+            'cliente': self.cbo_cliente.get(),
+            'equip': self.entry_equip.get(),
+            'defeito': self.entry_defeito.get(),
+            'valor': self.entry_valor.get(),
+            'status': self.cbo_status.get(),
+            'prioridade': self.cbo_prio.get(),
+            'tecnico': self.entry_tec.get(),
+            'obs': obs_completa
+        }
+
+        if not dados['cliente'] or not dados['equip']:
+            Messagebox.show_error("Preencha Cliente e Equipamento!")
+            return
+
+        if OSModel.salvar(dados['cliente'], dados['equip'], dados['defeito'], dados['valor'], 
+                          dados['status'], dados['prioridade'], dados['tecnico'], dados['obs']):
+            Messagebox.show_info("OS Aberta com Sucesso!")
+            self.on_confirm()
+            self.destroy()
+        else:
+            Messagebox.show_error("Erro ao salvar OS.")
+
+    def position_center(self):
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
+        self.geometry(f'+{x}+{y}')
+
+class EditOSPopup(ttk.Toplevel):
+    def __init__(self, parent, on_confirm, id_os):
+        super().__init__(parent)
+        self.geometry('850x700')
+        self.on_confirm = on_confirm
+        self.id_os = id_os
+
+        self.position_center()
+
+        # Buscar dados atuais
+        self.dados = OSModel.buscar_pod_id(id_os)
+        # Estrutura do DB: id(0), cliente_id(1), nome(2), equip(3), defeito(4), obs(5), tec(6), prio(7), status(8), valor(9), data(10), laudo(11)
+
+        frame = ttk.Frame(self, padding=20)
+        frame.pack(fill=BOTH, expand=YES)
+        frame.columnconfigure(0, weight=1)
+        frame.columnconfigure(1, weight=1)
+        
+        # Cabeçalho Informativo (Não editável para segurança)
+        info_frame = ttk.Labelframe(frame, text='Dados do Equipamento', padding=10, bootstyle='info')
+        info_frame.grid(row=0, columnspan=2, sticky=EW, pady=(0,20))
+
+        ttk.Label(info_frame, text=f"Cliente: {self.dados[2]}", font=("Calibri", 12, "bold")).pack(anchor=W)
+        ttk.Label(info_frame, text=f"Equipamento: {self.dados[3]} | Prioridade: {self.dados[7]}", font=("Calibri", 11)).pack(anchor=W)
+        ttk.Label(info_frame, text=f"Data Entrada: {self.dados[10]}", font=("Arial", 9), bootstyle="secondary").pack(anchor=W)
+
+        # --- CAMPOS EDITÁVEIS ---
+        
+        # Defeito (Caso precise ajustar)
+        ttk.Label(frame, text='Defeito Relatado').grid(row=1, column=2, sticky=W)
+        self.entry_defeito = ttk.Entry(frame)
+        self.entry_defeito.insert(0, self.dados[4] or '')
+        self.entry_defeito.grid(row=2, column=2, sticky=EW, pady=(0,10))
+
+        # Técnico e Status (Lado a Lado)
+        ttk.Label(frame, text='Técnico Responsavel').grid(row=3, column=0, sticky=W)
+        self.entry_tec = ttk.Entry(frame)
+        self.entry_tec.insert(0, self.dados[6] or '')
+        self.entry_tec.grid(row=4, column=0, sticky=EW, padx=(0,5), pady=(0,10))
+
+        ttk.Label(frame, text='Status Atual').grid(row=3, column=1, sticky=W)
+        self.cbo_status =  ttk.Combobox(frame, values=["Aberto", 
+                                                       "Em Análise", 
+                                                       "Aguardando Peça", 
+                                                       "Concluído", 
+                                                       "Cancelado"], state='readonly')
+        self.cbo_status.grid(row=4, column=1, sticky=EW, padx=5, pady=(0,10))
+
+        # LAUDO TÉCNICO (O campo mais importante)
+        ttk.Label(frame, text="Laudo Técnico / Serviço Realizado (Obrigatório p/ Concluir)", bootstyle="success").grid(row=5, sticky=W)
+        self.txt_laudo = ttk.Text(frame, height=5)
+        # Tenta pegar o laudo (índice 11). Se não existir (banco antigo), usa vazio.
+        laudo_atual = self.dados[11] if len(self.dados) > 11 else ""
+        self.txt_laudo.insert("1.0", laudo_atual or "")
+        self.txt_laudo.grid(row=6, columnspan=2, sticky=EW, pady=(0, 15))
+
+        # Obs e Valor
+        ttk.Label(frame, text="Observações Internas").grid(row=7, column=0, sticky=W)
+        self.entry_obs = ttk.Entry(frame)
+        self.entry_obs.insert(0, self.dados[5] or "")
+        self.entry_obs.grid(row=8, column=0, sticky=EW, padx=(0, 5))
+
+        ttk.Label(frame, text="Valor Final (R$)").grid(row=7, column=1, sticky=W)
+        self.entry_valor = ttk.Entry(frame)
+        self.entry_valor.insert(0, f"{self.dados[9]:.2f}")
+        self.entry_valor.grid(row=8, column=1, sticky=EW, padx=5)
+
+        # Botão Atualizar
+        ttk.Button(frame, text="SALVAR ALTERAÇÕES", bootstyle="primary", command=self.atualizar).grid(row=9, columnspan=2, sticky=EW, pady=30)
+
+    def atualizar(self):
+        # Validação para Concluir
+        novo_status = self.cbo_status.get()
+        laudo = self.txt_laudo.get("1.0", END).strip()
+        
+        if novo_status == "Concluído" and len(laudo) < 5:
+            Messagebox.show_warning("Para concluir a OS, você deve preencher o Laudo Técnico informando o que foi feito.", "Laudo Obrigatório")
+            return
+
+        if OSModel.atualizar(
+            self.id_os,
+            self.entry_tec.get(),
+            novo_status,
+            self.entry_defeito.get(),
+            self.entry_valor.get(),
+            self.entry_obs.get(),
+            laudo
+        ):
+            Messagebox.show_info("Ordem de Serviço atualizada!", "Sucesso")
+            self.on_confirm()
+            self.destroy()
+        else:
+            Messagebox.show_error("Erro ao atualizar.", "Erro")
+
+    def position_center(self):
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
         self.geometry(f'+{x}+{y}')

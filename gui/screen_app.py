@@ -14,7 +14,7 @@ class MainAppScreen(ttk.Frame):
         topbar = ttk.Frame(self, bootstyle='primary', padding=10)
         topbar.pack(side=TOP, fill=X)
 
-        ttk.Label(topbar, text="GUARDIÃO ERP", font=("Calibri", 18, "bold"), bootstyle="inverse-primary").pack(side=LEFT, padx=10)
+        ttk.Label(topbar, text="Synapse ERP", font=("Calibri", 18, "bold"), bootstyle="inverse-primary").pack(side=LEFT, padx=10)
         ttk.Label(topbar, text=f"Usuário: {usuario_logado}", font=("Calibri", 10), bootstyle="inverse-primary").pack(side=RIGHT, padx=10)
 
         # --- CONTAINER PRINCIPAL ---
