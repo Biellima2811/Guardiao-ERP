@@ -67,10 +67,22 @@ class DatabaseManager:
             FOREIGN KEY(os_id) REFERENCES servicos(id)
         ); 
         """
+        sql_despesas = """
+        CREATE TABLE IF NOT EXISTS despesas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            descricao TEXT NOT NULL,
+            categoria TEXT,
+            valor REAL NOT NULL,
+            data_despesa DATE DEFAULT CURRENT_DATE,
+            observacao TEXT
+        );
+        """
+
         self.executar_query(sql_protocolos)
         self.executar_query(sql_usuarios)
         self.executar_query(sql_clientes)
         self.executar_query(sql_servicos)
+        self.executar_query(sql_despesas)
 
     def migrar_banco(self):
         """Adiciona colunas novas caso o banco seja antigo"""
@@ -80,6 +92,17 @@ class DatabaseManager:
             'clientes': [('email', 'TEXT'), ('cep', 'TEXT'), ('bairro', 'TEXT'), ('uf', 'TEXT'), ('numero', 'TEXT'), ('endereco', 'TEXT')],
             'servicos': [('observacoes', 'TEXT'), ('tecnico', 'TEXT'), ('prioridade', 'TEXT'), ('laudo', 'TEXT')]
         }
+        sql_despesas = """
+        CREATE TABLE IF NOT EXISTS despesas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            descricao TEXT NOT NULL,
+            categoria TEXT,
+            valor REAL NOT NULL,
+            data_despesa DATE DEFAULT CURRENT_DATE,
+            observacao TEXT
+        );
+        """
+        self.executar_query(sql_despesas)
         
         try:
             with self.get_conexao() as conn:
