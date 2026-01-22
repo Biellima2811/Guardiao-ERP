@@ -77,12 +77,24 @@ class DatabaseManager:
             observacao TEXT
         );
         """
+        sql_produtos = """
+        CREATE TABLE IF NOT EXISTS produtos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            codigo TEXT,
+            preco_custo REAL DEFAULT 0.0,
+            preco_venda REAL DEFAULT 0.0,
+            estoque INTEGER DEFAULT 0,
+            descricao TEXT
+        );
+        """
 
         self.executar_query(sql_protocolos)
         self.executar_query(sql_usuarios)
         self.executar_query(sql_clientes)
         self.executar_query(sql_servicos)
         self.executar_query(sql_despesas)
+        self.executar_query(sql_produtos)
 
     def migrar_banco(self):
         """Adiciona colunas novas caso o banco seja antigo"""
@@ -100,6 +112,17 @@ class DatabaseManager:
             valor REAL NOT NULL,
             data_despesa DATE DEFAULT CURRENT_DATE,
             observacao TEXT
+        );
+        """
+        sql_produtos = """
+        CREATE TABLE IF NOT EXISTS produtos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL,
+            codigo TEXT,
+            preco_custo REAL DEFAULT 0.0,
+            preco_venda REAL DEFAULT 0.0,
+            estoque INTEGER DEFAULT 0,
+            descricao TEXT
         );
         """
         self.executar_query(sql_despesas)

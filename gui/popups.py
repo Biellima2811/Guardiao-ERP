@@ -4,6 +4,7 @@ from ttkbootstrap.dialogs import Messagebox
 from core.client_model import ClienteModel
 from core.os_model import OSModel
 from core.finance_model import FinanceModel
+from core.product_model import ProductModel
 import json
 import urllib.request # Para fazer a consulta na API ViaCEP
 
@@ -514,6 +515,110 @@ class AddExpensePopup(ttk.Toplevel):
             self.destroy()
         else:
             Messagebox.show_error("Erro ao salvar.")
+
+    def position_center(self):
+        self.update_idletasks()
+        x = (self.winfo_screenwidth() // 2) - (self.winfo_width() // 2)
+        y = (self.winfo_screenheight() // 2) - (self.winfo_height() // 2)
+        self.geometry(f'+{x}+{y}')
+
+class AddProductPopup(ttk.Toplevel):
+    def __init__(self, parent, on_confirm, dados_edicao=None):
+        super().__init__(parent)
+        self.on_confirm = on_confirm
+        self.dados_edicao = dados_edicao
+        
+        titulo = "Editar Produto" if dados_edicao else "Novo Produto"
+        self.title(titulo)
+        self.geometry("600x500")
+        self.position_center()
+        
+        frame = ttk.Frame(self, padding=20)
+        frame.pack(fill=BOTH, expand=YES)
+        
+        # Nome
+        ttk.Label(frame, text="Nome do Produto / Peça *").pack(anchor=W)
+        self.entry_nome = ttk.Entry(frame)
+        self.entry_nome.pack(fill=X, pady=(5, 10))
+        
+        # Código e Estoque
+        row1 = ttk.Frame(frame)
+        row1.pack(fill=X, pady=5)
+        
+        ttk.Label(row1, text="Código (Barras/Ref)").pack(side=LEFT)
+        self.entry_code = ttk.Entry(row1, width=20)
+        self.entry_code.pack(side=LEFT, padx=(5, 20))
+        
+        ttk.Label(row1, text="Estoque Inicial").pack(side=LEFT)
+        self.entry_qtd = ttk.Entry(row1, width=10)
+        self.entry_qtd.pack(side=LEFT, padx=5)
+        self.entry_qtd.insert(0, "0")
+
+        # Preços
+        row2 = ttk.Frame(frame)
+        row2.pack(fill=X, pady=10)
+        
+        col1 = ttk.Frame(row2)
+        col1.pack(side=LEFT, fill=X, expand=YES)
+        ttk.Label(col1, text="Preço de Custo (R$)").pack(anchor=W)
+        self.entry_custo = ttk.Entry(col1)
+        self.entry_custo.pack(fill=X, padx=(0, 5))
+        
+        col2 = ttk.Frame(row2)
+        col2.pack(side=LEFT, fill=X, expand=YES)
+        ttk.Label(col2, text="Preço de Venda (R$)").pack(anchor=W)
+        self.entry_venda = ttk.Entry(col2)
+        self.entry_venda.pack(fill=X, padx=(5, 0))
+
+        # Descrição
+        ttk.Label(frame, text="Descrição Detalhada").pack(anchor=W, pady=(10, 0))
+        self.txt_desc = ttk.Text(frame, height=4)
+        self.txt_desc.pack(fill=X, pady=5)
+
+        # Preencher se for edição
+        if dados_edicao:
+            # dados = (id, nome, codigo, estoque, venda, custo)
+            self.entry_nome.insert(0, dados_edicao[1])
+            self.entry_code.insert(0, dados_edicao[2] or "")
+            self.entry_qtd.insert(0, str(dados_edicao[3]))
+            self.entry_venda.insert(0, f"{dados_edicao[4]:.2f}")
+            self.entry_custo.insert(0, f"{dados_edicao[5]:.2f}")
+            
+            # Descrição (precisa buscar separado ou garantir que venha na query)
+            # Como a busca_todos não traz descrição, aqui pode vir vazio se não buscar_por_id
+            # Mas o buscar_por_id traz tudo (*).
+            if len(dados_edicao) > 6:
+                self.txt_desc.insert("1.0", dados_edicao[6] or "")
+
+        ttk.Button(frame, text="SALVAR PRODUTO", bootstyle="success", command=self.salvar).pack(fill=X, pady=20)
+
+    def salvar(self):
+        dados = [
+            self.entry_nome.get(),
+            self.entry_code.get(),
+            self.entry_custo.get(),
+            self.entry_venda.get(),
+            self.entry_qtd.get(),
+            self.txt_desc.get("1.0", END).strip()
+        ]
+        
+        if not dados[0]:
+            Messagebox.show_error("Nome é obrigatório!")
+            return
+
+        sucesso = False
+        if self.dados_edicao:
+            sucesso = ProductModel.atualizar(self.dados_edicao[0], *dados)
+        else:
+            sucesso = ProductModel.adicionar(*dados)
+            
+        if sucesso:
+            Messagebox.show_info("Produto salvo com sucesso!")
+            self.on_confirm()
+            self.destroy()
+        else:
+            # AGORA ELE AVISA SE DER ERRO!
+            Messagebox.show_error("Erro ao salvar produto!\nVerifique se os valores numéricos estão corretos.", "Erro de Banco")
 
     def position_center(self):
         self.update_idletasks()

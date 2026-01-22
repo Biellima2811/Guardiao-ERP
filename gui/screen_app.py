@@ -5,6 +5,7 @@ from gui.screen_clients import ClientesScreen
 from gui.screen_os import OSScreen
 from gui.screen_users import UsersScreen
 from gui.screen_finance import FinanceScreen
+from gui.screen_products import ProductsScreen
 from tkinter import messagebox
 
 class MainAppScreen(ttk.Frame):
@@ -49,6 +50,7 @@ class MainAppScreen(ttk.Frame):
         if self.nivel_acesso in ['admin', 'gerente']:
             self.criar_botao("💰  Financeiro", FinanceScreen)
         self.criar_botao("🛠️  Serviços/OS", OSScreen)
+        self.criar_botao("📦  Estoque/Produtos", ProductsScreen)
 
         # SE FOR ADMIN, MOSTRA O BOTÃO DE SEGURANÇA
         if self.nivel_acesso == 'admin':
